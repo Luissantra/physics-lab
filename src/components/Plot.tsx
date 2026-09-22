@@ -54,7 +54,7 @@ export default function Plot({
   const widest = Math.max(
     ...rows.map((value) => formatNumber(value, 2).length),
   );
-  const left = Math.min(120, Math.max(44, 14 + widest * 5.5));
+  const left = Math.max(54, 20 + widest * 6.2);
   const right = width - 27;
   const x = (v: number) => left + ((v - xmin) / (xmax - xmin)) * (right - left);
   const y = (v: number) => 155 - ((v - min) / (max - min)) * 127;

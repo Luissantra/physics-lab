@@ -385,7 +385,10 @@ export default function App() {
         <button
           className="sidebar-scrim"
           aria-label="Cerrar menú"
-          onClick={() => setMobileMenu(false)}
+          onClick={() => {
+            setMobileMenu(false);
+            menuButton.current?.focus();
+          }}
         />
       )}
       <aside ref={sidebar} className={`sidebar ${mobileMenu ? "open" : ""}`}>

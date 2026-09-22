@@ -1930,9 +1930,7 @@ kbd {
   .sidebar {
     transform: translateX(-100%);
     visibility: hidden;
-    transition:
-      transform 180ms ease,
-      visibility 180ms ease;
+    transition: transform 180ms ease;
     width: 242px;
     padding: 25px 19px 0;
   }
