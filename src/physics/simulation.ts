@@ -21,6 +21,7 @@ export interface Point {
   y: number;
   y2: number;
 }
+export type Refinement = 1 | 2 | 4;
 export interface Metric {
   label: string;
   value: number;
@@ -56,8 +57,13 @@ export class Simulation {
   history: Point[] = [];
   trail: { x: number; y: number }[] = [];
   initialEnergy = 0;
+  lastStep: number | null = null;
 
-  constructor(experiment: Experiment, params: Params) {
+  constructor(
+    experiment: Experiment,
+    params: Params,
+    readonly refinement: Refinement = 1,
+  ) {
     this.experiment = experiment;
     this.params = { ...params };
     const p = this.params;
@@ -121,10 +127,32 @@ export class Simulation {
   }
 
   get finished(): boolean {
-    return (
-      (this.wave !== null && this.time >= 8 - 1e-10) ||
-      (this.experiment.id === "twin" && this.time >= this.params.duration)
-    );
+    return this.time >= this.endTime;
+  }
+
+  get endTime(): number {
+    return this.wave
+      ? 8
+      : this.experiment.id === "twin"
+        ? this.params.duration
+        : Infinity;
+  }
+
+  get maxStep(): number | null {
+    switch (this.experiment.id) {
+      case "oscillator":
+        return 1 / (240 * this.refinement);
+      case "orbit":
+        return 1 / (4000 * this.refinement);
+      case "chaos":
+        return 1 / (480 * this.refinement);
+      case "charge":
+      case "packet":
+      case "tunnel":
+        return 0.01 / this.refinement;
+      default:
+        return null;
+    }
   }
 
   createGas(): void {
@@ -168,23 +196,14 @@ export class Simulation {
   }
 
   advance(dt: number): void {
-    if (this.finished || dt <= 0) return;
+    if (this.finished || !Number.isFinite(dt) || dt <= 0) return;
     const p = this.params;
     const id = this.experiment.id;
-    if (this.wave) dt = Math.min(dt, 8 - this.time);
-    if (id === "twin") dt = Math.min(dt, p.duration - this.time);
-    const maxStep =
-      id === "orbit"
-        ? 1 / 4000
-        : id === "chaos"
-          ? 1 / 480
-          : id === "charge" || this.wave
-            ? 0.01
-            : id === "gas"
-              ? 0.5
-              : 1 / 240;
+    dt = Math.min(dt, this.endTime - this.time);
+    const maxStep = this.maxStep ?? (id === "gas" ? 0.5 : dt);
     const steps = Math.ceil(dt / maxStep);
     const h = dt / steps;
+    this.lastStep = this.maxStep === null ? null : h;
     for (let i = 0; i < steps; i++) {
       switch (id) {
         case "oscillator":
@@ -266,10 +285,7 @@ export class Simulation {
           break;
       }
     }
-    this.time = Math.min(
-      this.time + dt,
-      this.wave ? 8 : id === "twin" ? p.duration : Infinity,
-    );
+    this.time = Math.min(this.time + dt, this.endTime);
     this.record();
   }
 

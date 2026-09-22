@@ -17,19 +17,22 @@ export default function Plot({
   unit,
   labels,
   marker,
+  secondaryPoints,
 }: {
   points: Point[];
   xLabel: string;
   unit: string;
   labels: [string, string];
   marker?: { x: number; y: number };
+  secondaryPoints?: { x: number; y: number }[];
 }) {
   const id = useId();
-  const finite = points
-    .flatMap((point) => [point.y, point.y2])
-    .filter(Number.isFinite);
-  const xmin = points.length ? Math.min(...points.map((point) => point.x)) : 0;
-  const xmax = Math.max(...points.map((point) => point.x), xmin + 0.01);
+  const secondary =
+    secondaryPoints ?? points.map((point) => ({ x: point.x, y: point.y2 }));
+  const all = [...points, ...secondary];
+  const finite = all.map((point) => point.y).filter(Number.isFinite);
+  const xmin = all.length ? Math.min(...all.map((point) => point.x)) : 0;
+  const xmax = Math.max(...all.map((point) => point.x), xmin + 0.01);
   const ymin = Math.min(...finite, 0),
     ymax = Math.max(...finite, ymin + 0.001);
   const padding = (ymax - ymin) * 0.12;
@@ -37,12 +40,12 @@ export default function Plot({
     max = ymax + padding;
   const x = (v: number) => 54 + ((v - xmin) / (xmax - xmin)) * 594;
   const y = (v: number) => 155 - ((v - min) / (max - min)) * 127;
-  const line = (key: "y" | "y2") =>
-    points
-      .filter((point) => Number.isFinite(point[key]))
+  const line = (data: { x: number; y: number }[]) =>
+    data
+      .filter((point) => Number.isFinite(point.x) && Number.isFinite(point.y))
       .map(
         (point, i) =>
-          `${i ? "L" : "M"}${x(point.x).toFixed(2)},${y(point[key]).toFixed(2)}`,
+          `${i ? "L" : "M"}${x(point.x).toFixed(2)},${y(point.y).toFixed(2)}`,
       )
       .join(" ");
   return (
@@ -77,14 +80,14 @@ export default function Plot({
         );
       })}
       <path
-        d={line("y2")}
+        d={line(secondary)}
         fill="none"
         stroke="#e6ad80"
         strokeWidth="1.6"
         strokeDasharray="4 4"
       />
       <path
-        d={line("y")}
+        d={line(points)}
         fill="none"
         stroke="#b5f6cd"
         strokeWidth="2"

@@ -96,6 +96,51 @@ una pregunta de investigación y referencia bibliográfica.
   incluye todas las capturas conservadas. Los números usan punto decimal.
 - Con `prefers-reduced-motion`, el laboratorio empieza pausado.
 
+## Comparación A/B y rigor numérico
+
+Activa «Comparación A/B · rigor numérico» en cualquier experimento. Cada caso
+tiene parámetros, preajustes y un estado independiente. En el oscilador, B
+propone amortiguamiento para contrastarlo con A; «Copiar A → B» permite partir
+de condiciones idénticas y variar una sola variable.
+
+- Un único reloj gobierna reproducción, pausa, velocidad, paso y reinicio.
+  Ambos casos se detienen en el primer límite temporal (por ejemplo, el
+  viaje de gemelos más corto). Cambiar parámetros o refinamiento reinicia y
+  pausa ambos. La comparación empieza siempre pausada.
+- Los gráficos superponen la misma magnitud con **ejes y unidades comunes**;
+  cada perfil conserva sus coordenadas, aunque los dominios sean distintos.
+  El gas compara densidad de probabilidad por unidad de rapidez, dividiendo
+  cada histograma por su anchura de intervalo. Las escenas Canvas son
+  esquemáticas y pueden tener escalas propias.
+- La tabla ofrece observables A, B y B − A simultáneos. Esa diferencia
+  física no se presenta como error numérico.
+- Los integradores admiten h base, h/2 y h/4; se muestran el máximo y el
+  último subpaso efectivo. El avance se divide en subpasos iguales que
+  alcanzan el tiempo solicitado sin superar el máximo. La cadencia de
+  pantalla no fija el paso interno.
+- En el oscilador, una solución analítica válida para amortiguamiento
+  subcrítico, crítico y sobreamortiguado separa error de posición/velocidad,
+  error de energía y disipación física. El error energético se normaliza
+  por E₀, no por una energía que podría tender a cero.
+- «Comprobar convergencia A/B» ejecuta tres integraciones independientes
+  hasta un período natural de cada configuración. Compara el error de
+  estado normalizado con la solución exacta y calcula el orden observado
+  con los pasos efectivos. Se espera orden cuatro para RK4 cuando domina
+  el error de truncamiento; no se estima orden con errores ≤ 10⁻¹³.
+- Los otros diagnósticos comprueban energía y momento angular orbital,
+  energía del péndulo normalizada por 3mgℓ, balance trabajo–energía de la
+  carga, energía del gas e intervalo de Lorentz. Los modelos analíticos
+  no muestran una convergencia temporal ficticia.
+- En cuántica se muestran norma, energía del Hamiltoniano discretizado,
+  probabilidad en los bordes y k₀Δx. Refinar h no cambia Δx ni el dominio:
+  conservar norma/energía no valida el error espacial ni elimina reflexiones.
+- El enlace A/B incluye ambas condiciones iniciales y refinamientos,
+  validados al cargarse. El CSV conserva configuración, método, diagnóstico
+  final, las últimas 400 muestras simultáneas y las curvas seleccionadas.
+  El muestreo de esas series sigue la cadencia visual. Salir del comparador
+  descarta su evolución; el enlace vuelve a t = 0. Las capturas del cuaderno
+  siguen perteneciendo al modo individual.
+
 ## Estructura
 
 ```text
@@ -103,6 +148,8 @@ src/physics/catalog.ts       Controles, presets, ecuaciones y guías
 src/physics/math.ts          Leyes analíticas y utilidades numéricas
 src/physics/quantum.ts       Solver complejo de Crank–Nicolson
 src/physics/simulation.ts    Estado físico, avance, medidas y perfiles
+src/physics/comparison.ts    Reloj A/B, observables y perfiles comparables
+src/physics/diagnostics.ts   Referencias, invariantes y convergencia RK4
 src/physics/render.ts        Visualizaciones Canvas 2D
 src/physics/physics.test.ts  Pruebas cuantitativas e invariantes
 src/components/             Gráficas SVG, fórmulas KaTeX y diálogos
@@ -124,6 +171,10 @@ de Carnot, invariancia de Lorentz, tiempo propio de los gemelos,
 norma/energía cuánticas, dispersión libre y transmisión de paquetes.
 
 También se ejercitan todos los modelos en los extremos de sus controles.
+La suite A/B verifica sincronización, límites temporales, unidades, perfiles
+con dominios distintos, densidad de rapidez, reproducción de enlaces y CSV.
+Las referencias del oscilador se contrastan con soluciones cerradas, la
+ecuación diferencial y RK4; se verifica orden de convergencia próximo a cuatro.
 Estas pruebas validan los modelos implementados y sus tolerancias; no
 sustituyen una revisión curricular ni pruebas de interfaz en navegador.
 

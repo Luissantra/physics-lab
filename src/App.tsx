@@ -65,6 +65,7 @@ import {
 import Plot, { formatNumber } from "./components/Plot";
 import Formula from "./components/Formula";
 import Dialog from "./components/Dialog";
+import ComparisonLab from "./components/ComparisonLab";
 
 const domainIcons = {
   mechanics: Orbit,
@@ -80,6 +81,12 @@ export default function App() {
   const [initial] = useState(initialExperiment);
   const [experiment, setExperiment] = useState(initial.experiment);
   const [params, setParams] = useState(initial.params);
+  const [comparisonMode, setComparisonMode] = useState(
+    Boolean(initial.comparison),
+  );
+  const [comparisonInitial, setComparisonInitial] = useState(
+    initial.comparison,
+  );
   const [resetCount, setResetCount] = useState(0);
   const simulation = useMemo(() => {
     void resetCount;
@@ -124,7 +131,7 @@ export default function App() {
   useEffect(() => () => clearTimeout(toastTimeout.current), []);
 
   useEffect(() => {
-    if (!running || page !== "lab") return;
+    if (!running || page !== "lab" || comparisonMode) return;
     let id = 0,
       previous = 0;
     const animate = (now: number) => {
@@ -144,13 +151,13 @@ export default function App() {
     };
     id = requestAnimationFrame(animate);
     return () => cancelAnimationFrame(id);
-  }, [simulation, running, speed, page]);
+  }, [simulation, running, speed, page, comparisonMode]);
 
   useEffect(() => {
     const element = canvas.current;
     if (!element) return;
     renderSimulation(element, simulation, options);
-  }, [simulation, frame, options, expanded, page]);
+  }, [simulation, frame, options, expanded, page, comparisonMode]);
 
   useEffect(() => {
     const element = canvas.current;
@@ -160,7 +167,7 @@ export default function App() {
     );
     observer.observe(element);
     return () => observer.disconnect();
-  }, [simulation, options, page, expanded]);
+  }, [simulation, options, page, expanded, comparisonMode]);
 
   useEffect(() => {
     const element = canvasDialog.current;
@@ -188,7 +195,7 @@ export default function App() {
           event.target.isContentEditable)
       )
         return;
-      if (dialog || page !== "lab") return;
+      if (dialog || page !== "lab" || comparisonMode) return;
       if (event.code === "Space") {
         event.preventDefault();
         toggleRunning();
@@ -197,10 +204,11 @@ export default function App() {
     };
     window.addEventListener("keydown", listener);
     return () => window.removeEventListener("keydown", listener);
-  }, [dialog, page, reset, toggleRunning]);
+  }, [dialog, page, reset, toggleRunning, comparisonMode]);
 
   function selectExperiment(next: Experiment, nextParams?: Params) {
     setExperiment(next);
+    setComparisonInitial(undefined);
     setParams(sanitizeParams(next, nextParams ?? defaults(next)));
     setPage("lab");
     setMobileMenu(false);
@@ -567,426 +575,467 @@ export default function App() {
                   <span className="small-dot" /> Modelo reproducible
                 </span>
               </div>
-              <div className="workbench">
-                <section
-                  className="simulation-panel"
-                  aria-label="Simulación interactiva"
+              <div className="lab-mode" aria-label="Modo de laboratorio">
+                <button
+                  aria-pressed={!comparisonMode}
+                  className={!comparisonMode ? "active" : ""}
+                  onClick={() => setComparisonMode(false)}
                 >
-                  <div className="panel-header">
-                    <div className="panel-title">
-                      <span
-                        className={`status-dot ${running && !simulation.finished ? "running" : ""}`}
-                      />
-                      <h2>
-                        {running && !simulation.finished
-                          ? "Simulación en vivo"
-                          : simulation.finished
-                            ? "Simulación finalizada"
-                            : "Simulación en pausa"}
-                      </h2>
-                    </div>
-                    <div className="canvas-tools">
-                      <button
-                        className={`icon-button ${options.grid ? "enabled" : ""}`}
-                        title="Mostrar cuadrícula"
-                        aria-label="Mostrar cuadrícula"
-                        aria-pressed={options.grid}
-                        onClick={() =>
-                          setOptions((current) => ({
-                            ...current,
-                            grid: !current.grid,
-                          }))
-                        }
-                      >
-                        <Grid2X2 size={15} />
-                      </button>
-                      <button
-                        className="icon-button"
-                        title="Ampliar simulación"
-                        aria-label="Ampliar simulación"
-                        onClick={() => setExpanded(true)}
-                      >
-                        <Expand size={16} />
-                      </button>
-                    </div>
-                  </div>
-                  <div className="canvas-wrap">
-                    <div className="canvas-caption">
-                      <span>{experiment.tag}</span>
-                      <span>
-                        {experiment.id === "packet" ||
-                        experiment.id === "tunnel"
-                          ? "ℏ = m = 1"
-                          : "MODELO FÍSICO"}
-                      </span>
-                    </div>
-                    {!expanded && canvasElement}
-                    <div className="canvas-legend">
-                      <span>
-                        <i />
-                        {experiment.id === "chaos"
-                          ? "Sistema A"
-                          : experiment.domain === "quantum"
-                            ? "Probabilidad"
-                            : "Sistema"}
-                      </span>
-                      <span>
-                        <i className="orange" />
-                        {experiment.id === "chaos"
-                          ? "Sistema B"
-                          : experiment.domain === "quantum"
-                            ? "Potencial"
-                            : "Referencia"}
-                      </span>
-                      <span className="canvas-dimensions">
-                        {experiment.id === "gas" ? "3D → XY" : "2D"}
-                      </span>
-                    </div>
-                  </div>
-                  <div className="playback">
-                    <div className="playback-buttons">
-                      <button
-                        className="play-button"
-                        aria-label={
-                          running ? "Pausar simulación" : "Iniciar simulación"
-                        }
-                        title="Espacio: reproducir o pausar"
-                        onClick={toggleRunning}
-                      >
-                        {running ? (
-                          <Pause size={17} fill="currentColor" />
-                        ) : (
-                          <Play size={17} fill="currentColor" />
-                        )}
-                      </button>
-                      <button
-                        className="icon-button"
-                        aria-label="Avanzar un paso"
-                        title={`Avanzar ${formatNumber(simulation.rate / 60, 5)} ${experiment.timeUnit}`}
-                        disabled={simulation.finished}
-                        onClick={() => {
-                          setRunning(false);
-                          simulation.advance(simulation.rate / 60);
-                          setFrame((value) => value + 1);
-                        }}
-                      >
-                        <SkipForward size={17} />
-                      </button>
-                      <button
-                        className="icon-button"
-                        aria-label="Reiniciar simulación"
-                        title="Reiniciar (R)"
-                        onClick={reset}
-                      >
-                        <RotateCcw size={16} />
-                      </button>
-                      <span className="playback-divider" />
-                      <label className="speed-select">
-                        <Gauge size={15} />
-                        <select
-                          aria-label="Velocidad de reproducción"
-                          value={speed}
-                          onChange={(event) =>
-                            setSpeed(Number(event.target.value))
-                          }
+                  Exploración individual
+                </button>
+                <button
+                  aria-pressed={comparisonMode}
+                  className={comparisonMode ? "active" : ""}
+                  onClick={() => {
+                    setRunning(false);
+                    setComparisonMode(true);
+                  }}
+                >
+                  Comparación A/B · rigor numérico
+                </button>
+              </div>
+              {comparisonMode ? (
+                <ComparisonLab
+                  key={experiment.id}
+                  experiment={experiment}
+                  initialParams={params}
+                  initialComparison={comparisonInitial}
+                  active={!dialog}
+                  notify={notify}
+                />
+              ) : (
+                <>
+                  <div className="workbench">
+                    <section
+                      className="simulation-panel"
+                      aria-label="Simulación interactiva"
+                    >
+                      <div className="panel-header">
+                        <div className="panel-title">
+                          <span
+                            className={`status-dot ${running && !simulation.finished ? "running" : ""}`}
+                          />
+                          <h2>
+                            {running && !simulation.finished
+                              ? "Simulación en vivo"
+                              : simulation.finished
+                                ? "Simulación finalizada"
+                                : "Simulación en pausa"}
+                          </h2>
+                        </div>
+                        <div className="canvas-tools">
+                          <button
+                            className={`icon-button ${options.grid ? "enabled" : ""}`}
+                            title="Mostrar cuadrícula"
+                            aria-label="Mostrar cuadrícula"
+                            aria-pressed={options.grid}
+                            onClick={() =>
+                              setOptions((current) => ({
+                                ...current,
+                                grid: !current.grid,
+                              }))
+                            }
+                          >
+                            <Grid2X2 size={15} />
+                          </button>
+                          <button
+                            className="icon-button"
+                            title="Ampliar simulación"
+                            aria-label="Ampliar simulación"
+                            onClick={() => setExpanded(true)}
+                          >
+                            <Expand size={16} />
+                          </button>
+                        </div>
+                      </div>
+                      <div className="canvas-wrap">
+                        <div className="canvas-caption">
+                          <span>{experiment.tag}</span>
+                          <span>
+                            {experiment.id === "packet" ||
+                            experiment.id === "tunnel"
+                              ? "ℏ = m = 1"
+                              : "MODELO FÍSICO"}
+                          </span>
+                        </div>
+                        {!expanded && canvasElement}
+                        <div className="canvas-legend">
+                          <span>
+                            <i />
+                            {experiment.id === "chaos"
+                              ? "Sistema A"
+                              : experiment.domain === "quantum"
+                                ? "Probabilidad"
+                                : "Sistema"}
+                          </span>
+                          <span>
+                            <i className="orange" />
+                            {experiment.id === "chaos"
+                              ? "Sistema B"
+                              : experiment.domain === "quantum"
+                                ? "Potencial"
+                                : "Referencia"}
+                          </span>
+                          <span className="canvas-dimensions">
+                            {experiment.id === "gas" ? "3D → XY" : "2D"}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="playback">
+                        <div className="playback-buttons">
+                          <button
+                            className="play-button"
+                            aria-label={
+                              running
+                                ? "Pausar simulación"
+                                : "Iniciar simulación"
+                            }
+                            title="Espacio: reproducir o pausar"
+                            onClick={toggleRunning}
+                          >
+                            {running ? (
+                              <Pause size={17} fill="currentColor" />
+                            ) : (
+                              <Play size={17} fill="currentColor" />
+                            )}
+                          </button>
+                          <button
+                            className="icon-button"
+                            aria-label="Avanzar un paso"
+                            title={`Avanzar ${formatNumber(simulation.rate / 60, 5)} ${experiment.timeUnit}`}
+                            disabled={simulation.finished}
+                            onClick={() => {
+                              setRunning(false);
+                              simulation.advance(simulation.rate / 60);
+                              setFrame((value) => value + 1);
+                            }}
+                          >
+                            <SkipForward size={17} />
+                          </button>
+                          <button
+                            className="icon-button"
+                            aria-label="Reiniciar simulación"
+                            title="Reiniciar (R)"
+                            onClick={reset}
+                          >
+                            <RotateCcw size={16} />
+                          </button>
+                          <span className="playback-divider" />
+                          <label className="speed-select">
+                            <Gauge size={15} />
+                            <select
+                              aria-label="Velocidad de reproducción"
+                              value={speed}
+                              onChange={(event) =>
+                                setSpeed(Number(event.target.value))
+                              }
+                            >
+                              {[0.25, 0.5, 1, 2].map((value) => (
+                                <option key={value} value={value}>
+                                  {value}×
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+                        </div>
+                        <div className="time-display">
+                          <span>t</span>
+                          <output>{simulation.time.toFixed(2)}</output>
+                          <span>{experiment.timeUnit}</span>
+                        </div>
+                      </div>
+                    </section>
+                    <section
+                      className="parameters-panel"
+                      aria-labelledby="parameter-title"
+                    >
+                      <div className="panel-header">
+                        <div className="panel-title">
+                          <Settings2 size={16} />
+                          <h2 id="parameter-title">Parámetros</h2>
+                        </div>
+                        <button
+                          className="text-button"
+                          onClick={() => {
+                            setParams(defaults(experiment));
+                            notify("Parámetros originales restaurados");
+                          }}
                         >
-                          {[0.25, 0.5, 1, 2].map((value) => (
-                            <option key={value} value={value}>
-                              {value}×
+                          Restaurar
+                        </button>
+                      </div>
+                      <div className="parameter-content">
+                        <label className="preset-label" htmlFor="preset">
+                          CONFIGURACIÓN INICIAL
+                        </label>
+                        <div className="preset-select">
+                          <FlaskConical size={15} />
+                          <select
+                            id="preset"
+                            value=""
+                            onChange={(event) => {
+                              const preset =
+                                experiment.presets[Number(event.target.value)];
+                              if (preset) applyPreset(preset);
+                            }}
+                          >
+                            <option value="" disabled>
+                              Elegir una configuración
                             </option>
+                            {experiment.presets.map((preset, i) => (
+                              <option key={preset.name} value={i}>
+                                {preset.name}
+                              </option>
+                            ))}
+                          </select>
+                          <ChevronDown size={15} />
+                        </div>
+                        <div className="sliders">
+                          {experiment.controls.map((control) => (
+                            <div className="parameter" key={control.key}>
+                              <div className="parameter-label">
+                                <label htmlFor={`control-${control.key}`}>
+                                  {control.label}
+                                </label>
+                                <span className="parameter-value">
+                                  <output htmlFor={`control-${control.key}`}>
+                                    {formatNumber(params[control.key], 2)}
+                                  </output>
+                                  <small>{control.unit}</small>
+                                </span>
+                              </div>
+                              <input
+                                id={`control-${control.key}`}
+                                type="range"
+                                min={control.min}
+                                max={control.max}
+                                step={control.step}
+                                value={params[control.key]}
+                                aria-valuetext={`${formatNumber(params[control.key], 2)} ${control.unit}`}
+                                style={
+                                  {
+                                    "--range-progress": `${((params[control.key] - control.min) / (control.max - control.min)) * 100}%`,
+                                  } as CSSProperties
+                                }
+                                onChange={(event) =>
+                                  updateParam(
+                                    control.key,
+                                    Number(event.target.value),
+                                  )
+                                }
+                              />
+                              <div className="range-endpoints">
+                                <span>{formatNumber(control.min)}</span>
+                                <span>
+                                  {formatNumber(control.max)} {control.unit}
+                                </span>
+                              </div>
+                            </div>
                           ))}
-                        </select>
-                      </label>
-                    </div>
-                    <div className="time-display">
-                      <span>t</span>
-                      <output>{simulation.time.toFixed(2)}</output>
-                      <span>{experiment.timeUnit}</span>
-                    </div>
-                  </div>
-                </section>
-                <section
-                  className="parameters-panel"
-                  aria-labelledby="parameter-title"
-                >
-                  <div className="panel-header">
-                    <div className="panel-title">
-                      <Settings2 size={16} />
-                      <h2 id="parameter-title">Parámetros</h2>
-                    </div>
-                    <button
-                      className="text-button"
-                      onClick={() => {
-                        setParams(defaults(experiment));
-                        notify("Parámetros originales restaurados");
-                      }}
-                    >
-                      Restaurar
-                    </button>
-                  </div>
-                  <div className="parameter-content">
-                    <label className="preset-label" htmlFor="preset">
-                      CONFIGURACIÓN INICIAL
-                    </label>
-                    <div className="preset-select">
-                      <FlaskConical size={15} />
-                      <select
-                        id="preset"
-                        value=""
-                        onChange={(event) => {
-                          const preset =
-                            experiment.presets[Number(event.target.value)];
-                          if (preset) applyPreset(preset);
-                        }}
-                      >
-                        <option value="" disabled>
-                          Elegir una configuración
-                        </option>
-                        {experiment.presets.map((preset, i) => (
-                          <option key={preset.name} value={i}>
-                            {preset.name}
-                          </option>
-                        ))}
-                      </select>
-                      <ChevronDown size={15} />
-                    </div>
-                    <div className="sliders">
-                      {experiment.controls.map((control) => (
-                        <div className="parameter" key={control.key}>
-                          <div className="parameter-label">
-                            <label htmlFor={`control-${control.key}`}>
-                              {control.label}
+                        </div>
+                        <div className="parameter-hint">
+                          <RotateCcw size={12} />
+                          Cada cambio reinicia el tiempo.
+                        </div>
+                        <div className="display-options">
+                          <span>VISUALIZACIÓN</span>
+                          <label>
+                            <input
+                              type="checkbox"
+                              checked={options.grid}
+                              onChange={(event) =>
+                                setOptions((current) => ({
+                                  ...current,
+                                  grid: event.target.checked,
+                                }))
+                              }
+                            />
+                            Cuadrícula
+                          </label>
+                          {[
+                            "oscillator",
+                            "orbit",
+                            "charge",
+                            "wave",
+                            "packet",
+                            "tunnel",
+                          ].includes(experiment.id) && (
+                            <label>
+                              <input
+                                type="checkbox"
+                                checked={options.vectors}
+                                onChange={(event) =>
+                                  setOptions((current) => ({
+                                    ...current,
+                                    vectors: event.target.checked,
+                                  }))
+                                }
+                              />
+                              {experiment.domain === "quantum"
+                                ? "Re ψ / Im ψ"
+                                : experiment.id === "wave"
+                                  ? "Ondas viajeras"
+                                  : "Vectores"}
                             </label>
-                            <span className="parameter-value">
-                              <output htmlFor={`control-${control.key}`}>
-                                {formatNumber(params[control.key], 2)}
-                              </output>
-                              <small>{control.unit}</small>
-                            </span>
-                          </div>
-                          <input
-                            id={`control-${control.key}`}
-                            type="range"
-                            min={control.min}
-                            max={control.max}
-                            step={control.step}
-                            value={params[control.key]}
-                            aria-valuetext={`${formatNumber(params[control.key], 2)} ${control.unit}`}
-                            style={
-                              {
-                                "--range-progress": `${((params[control.key] - control.min) / (control.max - control.min)) * 100}%`,
-                              } as CSSProperties
-                            }
-                            onChange={(event) =>
-                              updateParam(
-                                control.key,
-                                Number(event.target.value),
-                              )
-                            }
-                          />
-                          <div className="range-endpoints">
-                            <span>{formatNumber(control.min)}</span>
-                            <span>
-                              {formatNumber(control.max)} {control.unit}
-                            </span>
-                          </div>
+                          )}
+                          {["orbit", "chaos", "charge"].includes(
+                            experiment.id,
+                          ) && (
+                            <label>
+                              <input
+                                type="checkbox"
+                                checked={options.trace}
+                                onChange={(event) =>
+                                  setOptions((current) => ({
+                                    ...current,
+                                    trace: event.target.checked,
+                                  }))
+                                }
+                              />
+                              Trayectoria
+                            </label>
+                          )}
                         </div>
-                      ))}
-                    </div>
-                    <div className="parameter-hint">
-                      <RotateCcw size={12} />
-                      Cada cambio reinicia el tiempo.
-                    </div>
-                    <div className="display-options">
-                      <span>VISUALIZACIÓN</span>
-                      <label>
-                        <input
-                          type="checkbox"
-                          checked={options.grid}
-                          onChange={(event) =>
-                            setOptions((current) => ({
-                              ...current,
-                              grid: event.target.checked,
-                            }))
-                          }
-                        />
-                        Cuadrícula
-                      </label>
-                      {[
-                        "oscillator",
-                        "orbit",
-                        "charge",
-                        "wave",
-                        "packet",
-                        "tunnel",
-                      ].includes(experiment.id) && (
-                        <label>
-                          <input
-                            type="checkbox"
-                            checked={options.vectors}
-                            onChange={(event) =>
-                              setOptions((current) => ({
-                                ...current,
-                                vectors: event.target.checked,
-                              }))
-                            }
-                          />
-                          {experiment.domain === "quantum"
-                            ? "Re ψ / Im ψ"
-                            : experiment.id === "wave"
-                              ? "Ondas viajeras"
-                              : "Vectores"}
-                        </label>
-                      )}
-                      {["orbit", "chaos", "charge"].includes(experiment.id) && (
-                        <label>
-                          <input
-                            type="checkbox"
-                            checked={options.trace}
-                            onChange={(event) =>
-                              setOptions((current) => ({
-                                ...current,
-                                trace: event.target.checked,
-                              }))
-                            }
-                          />
-                          Trayectoria
-                        </label>
-                      )}
-                    </div>
+                      </div>
+                    </section>
                   </div>
-                </section>
-              </div>
-              <section className="metrics-row" aria-label="Mediciones actuales">
-                {readout.metrics.map((metric, i) => (
-                  <div className="metric-card" key={metric.label}>
-                    <div className="metric-label">
-                      <span className={`metric-line line-${i}`} />
-                      {metric.label}
-                    </div>
-                    <div className="metric-value">
-                      <output>{formatNumber(metric.value)}</output>
-                      <span>{metric.unit}</span>
-                    </div>
-                  </div>
-                ))}
-              </section>
-              <div className="analysis-row">
-                <section className="chart-panel">
-                  <div className="panel-header">
-                    <div className="panel-title">
-                      <Activity size={16} />
-                      <h2>{experiment.chartTitle}</h2>
-                    </div>
-                    <button
-                      className="icon-button"
-                      aria-label="Exportar datos como CSV"
-                      title="Exportar datos"
-                      onClick={exportExperiment}
-                    >
-                      <ArrowDownToLine size={15} />
-                    </button>
-                  </div>
-                  <div className="chart-legend">
-                    <span>
-                      <i />
-                      {experiment.series[0]}
-                    </span>
-                    <span>
-                      <i className="orange" />
-                      {experiment.series[1]}
-                    </span>
-                    <span className="chart-live">TIEMPO REAL</span>
-                  </div>
-                  <Plot
-                    points={chart.points}
-                    xLabel={chart.xLabel}
-                    unit={experiment.chartUnit}
-                    labels={experiment.series}
-                    marker={
-                      currentCarnot
-                        ? {
-                            x: currentCarnot.volume * 1000,
-                            y: currentCarnot.pressure / 1000,
-                          }
-                        : undefined
-                    }
-                  />
-                  <div className="diagnostic">
-                    <span className="small-dot" />
-                    {readout.note}
-                  </div>
-                </section>
-                <section className="theory-panel">
-                  <div
-                    className="theory-tabs"
-                    aria-label="Información del modelo"
+                  <section
+                    className="metrics-row"
+                    aria-label="Mediciones actuales"
                   >
-                    {(
-                      [
-                        { id: "theory", label: "El modelo" },
-                        { id: "method", label: "Método" },
-                        { id: "limits", label: "Supuestos" },
-                      ] as const
-                    ).map((tab) => (
-                      <button
-                        key={tab.id}
-                        className={theoryTab === tab.id ? "active" : ""}
-                        aria-pressed={theoryTab === tab.id}
-                        onClick={() => setTheoryTab(tab.id)}
-                      >
-                        {tab.label}
-                      </button>
-                    ))}
-                    <BookOpen size={15} />
-                  </div>
-                  <div className="theory-content">
-                    {theoryTab === "theory" ? (
-                      <>
-                        <Formula value={experiment.formula} />
-                        <p>{experiment.theory}</p>
-                      </>
-                    ) : (
-                      <>
-                        <div className="theory-kicker">
-                          {theoryTab === "method"
-                            ? "CÓMO SE CALCULA"
-                            : "ALCANCE Y LIMITACIONES"}
+                    {readout.metrics.map((metric, i) => (
+                      <div className="metric-card" key={metric.label}>
+                        <div className="metric-label">
+                          <span className={`metric-line line-${i}`} />
+                          {metric.label}
                         </div>
-                        <p>
-                          {theoryTab === "method"
-                            ? experiment.method
-                            : experiment.assumptions}
-                        </p>
-                      </>
-                    )}
-                    <a
-                      href={experiment.reference.url}
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      Consultar referencia
-                      <MoveUpRight size={12} />
-                    </a>
+                        <div className="metric-value">
+                          <output>{formatNumber(metric.value)}</output>
+                          <span>{metric.unit}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </section>
+                  <div className="analysis-row">
+                    <section className="chart-panel">
+                      <div className="panel-header">
+                        <div className="panel-title">
+                          <Activity size={16} />
+                          <h2>{experiment.chartTitle}</h2>
+                        </div>
+                        <button
+                          className="icon-button"
+                          aria-label="Exportar datos como CSV"
+                          title="Exportar datos"
+                          onClick={exportExperiment}
+                        >
+                          <ArrowDownToLine size={15} />
+                        </button>
+                      </div>
+                      <div className="chart-legend">
+                        <span>
+                          <i />
+                          {experiment.series[0]}
+                        </span>
+                        <span>
+                          <i className="orange" />
+                          {experiment.series[1]}
+                        </span>
+                        <span className="chart-live">TIEMPO REAL</span>
+                      </div>
+                      <Plot
+                        points={chart.points}
+                        xLabel={chart.xLabel}
+                        unit={experiment.chartUnit}
+                        labels={experiment.series}
+                        marker={
+                          currentCarnot
+                            ? {
+                                x: currentCarnot.volume * 1000,
+                                y: currentCarnot.pressure / 1000,
+                              }
+                            : undefined
+                        }
+                      />
+                      <div className="diagnostic">
+                        <span className="small-dot" />
+                        {readout.note}
+                      </div>
+                    </section>
+                    <section className="theory-panel">
+                      <div
+                        className="theory-tabs"
+                        aria-label="Información del modelo"
+                      >
+                        {(
+                          [
+                            { id: "theory", label: "El modelo" },
+                            { id: "method", label: "Método" },
+                            { id: "limits", label: "Supuestos" },
+                          ] as const
+                        ).map((tab) => (
+                          <button
+                            key={tab.id}
+                            className={theoryTab === tab.id ? "active" : ""}
+                            aria-pressed={theoryTab === tab.id}
+                            onClick={() => setTheoryTab(tab.id)}
+                          >
+                            {tab.label}
+                          </button>
+                        ))}
+                        <BookOpen size={15} />
+                      </div>
+                      <div className="theory-content">
+                        {theoryTab === "theory" ? (
+                          <>
+                            <Formula value={experiment.formula} />
+                            <p>{experiment.theory}</p>
+                          </>
+                        ) : (
+                          <>
+                            <div className="theory-kicker">
+                              {theoryTab === "method"
+                                ? "CÓMO SE CALCULA"
+                                : "ALCANCE Y LIMITACIONES"}
+                            </div>
+                            <p>
+                              {theoryTab === "method"
+                                ? experiment.method
+                                : experiment.assumptions}
+                            </p>
+                          </>
+                        )}
+                        <a
+                          href={experiment.reference.url}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          Consultar referencia
+                          <MoveUpRight size={12} />
+                        </a>
+                      </div>
+                    </section>
                   </div>
-                </section>
-              </div>
-              <div className="bottom-actions">
-                <div>
-                  <Lightbulb size={17} />
-                  <span>Cambia una variable. Observa lo que permanece.</span>
-                </div>
-                <div>
-                  <button onClick={share}>
-                    <Link2 size={15} />
-                    Copiar configuración
-                  </button>
-                  <button onClick={saveMeasurement}>
-                    <BookmarkPlus size={15} />
-                    Guardar medición
-                  </button>
-                </div>
-              </div>
+                  <div className="bottom-actions">
+                    <div>
+                      <Lightbulb size={17} />
+                      <span>
+                        Cambia una variable. Observa lo que permanece.
+                      </span>
+                    </div>
+                    <div>
+                      <button onClick={share}>
+                        <Link2 size={15} />
+                        Copiar configuración
+                      </button>
+                      <button onClick={saveMeasurement}>
+                        <BookmarkPlus size={15} />
+                        Guardar medición
+                      </button>
+                    </div>
+                  </div>
+                </>
+              )}
             </>
           )}
           {page === "library" && (
