@@ -18,13 +18,19 @@ describe("Etiquetas de ejes cuantitativos", () => {
         labels={["A", "B"]}
       />,
     );
-    const ticks = [...markup.matchAll(/<text x="43"[^>]*>(.*?)<\/text>/g)].map(
-      (match) => Number(match[1].replace(",", ".")),
-    );
+    const labels = [
+      ...markup.matchAll(
+        /class="plot-tick-y" x="([\d.]+)"[^>]*>(.*?)<\/text>/g,
+      ),
+    ];
+    const ticks = labels.map((match) => Number(match[2].replace(",", ".")));
     expect(ticks).toHaveLength(4);
     expect(new Set(ticks).size).toBe(4);
     expect(ticks[0]).toBeLessThanOrEqual(minimum);
     expect(ticks.at(-1)).toBeGreaterThan(maximum);
     expect(ticks.every(Number.isFinite)).toBe(true);
+    const anchor = Number(labels[0][1]);
+    const widest = Math.max(...labels.map((match) => match[2].length));
+    expect(anchor).toBeGreaterThanOrEqual(widest * 5.4);
   });
 });

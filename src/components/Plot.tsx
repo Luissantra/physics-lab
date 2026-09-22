@@ -1,4 +1,4 @@
-import { useId } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import type { Point } from "../physics/simulation";
 
 export function formatNumber(value: number, digits = 3): string {
@@ -28,6 +28,17 @@ export default function Plot({
   secondaryPoints?: { x: number; y: number }[];
 }) {
   const id = useId();
+  const ref = useRef<SVGSVGElement>(null);
+  const [width, setWidth] = useState(675);
+  useEffect(() => {
+    const element = ref.current;
+    if (!element) return;
+    const observer = new ResizeObserver(([entry]) =>
+      setWidth(Math.max(320, entry.contentRect.width)),
+    );
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
   const secondary =
     secondaryPoints ?? points.map((point) => ({ x: point.x, y: point.y2 }));
   const all = [...points, ...secondary];
@@ -39,7 +50,13 @@ export default function Plot({
   const padding = (ymax - ymin) * 0.12;
   const min = ymin < 0 ? ymin - padding : ymin,
     max = ymax + padding;
-  const x = (v: number) => 54 + ((v - xmin) / (xmax - xmin)) * 594;
+  const rows = [0, 1, 2, 3].map((index) => min + ((max - min) * index) / 3);
+  const widest = Math.max(
+    ...rows.map((value) => formatNumber(value, 2).length),
+  );
+  const left = Math.min(120, Math.max(44, 14 + widest * 5.5));
+  const right = width - 27;
+  const x = (v: number) => left + ((v - xmin) / (xmax - xmin)) * (right - left);
   const y = (v: number) => 155 - ((v - min) / (max - min)) * 127;
   const line = (data: { x: number; y: number }[]) =>
     data
@@ -50,32 +67,45 @@ export default function Plot({
       )
       .join(" ");
   return (
-    <svg className="plot" viewBox="0 0 675 204" role="img" aria-labelledby={id}>
+    <svg
+      ref={ref}
+      className="plot"
+      viewBox={`0 0 ${width} 204`}
+      role="img"
+      aria-labelledby={id}
+    >
       <title id={id}>
         {labels[0]} y {labels[1]}. Eje horizontal: {xLabel}. Eje vertical:{" "}
         {unit}.
       </title>
-      {[0, 1, 2, 3].map((index) => {
-        const value = min + ((max - min) * index) / 3;
-        return (
-          <g key={index}>
-            <line
-              x1="54"
-              x2="648"
-              y1={y(value)}
-              y2={y(value)}
-              className="plot-grid"
-            />
-            <text x="43" y={y(value) + 4} textAnchor="end">
-              {formatNumber(value, 2)}
-            </text>
-          </g>
-        );
-      })}
+      {rows.map((value, index) => (
+        <g key={index}>
+          <line
+            x1={left}
+            x2={right}
+            y1={y(value)}
+            y2={y(value)}
+            className="plot-grid"
+          />
+          <text
+            className="plot-tick-y"
+            x={left - 11}
+            y={y(value) + 4}
+            textAnchor="end"
+          >
+            {formatNumber(value, 2)}
+          </text>
+        </g>
+      ))}
       {[0, 1, 2, 3, 4].map((index) => {
         const value = xmin + ((xmax - xmin) * index) / 4;
         return (
-          <text key={index} x={x(value)} y="177" textAnchor="middle">
+          <text
+            key={index}
+            x={x(value)}
+            y="177"
+            textAnchor={index === 0 ? "start" : index === 4 ? "end" : "middle"}
+          >
             {formatNumber(value, 2)}
           </text>
         );
@@ -104,10 +134,10 @@ export default function Plot({
           strokeWidth="2"
         />
       )}
-      <text x="54" y="14">
+      <text x={left} y="14">
         {unit}
       </text>
-      <text x="351" y="199" textAnchor="middle">
+      <text x={(left + right) / 2} y="199" textAnchor="middle">
         {xLabel}
       </text>
     </svg>

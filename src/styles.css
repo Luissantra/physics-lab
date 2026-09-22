@@ -1929,12 +1929,16 @@ kbd {
 @media (max-width: 780px) {
   .sidebar {
     transform: translateX(-100%);
-    transition: transform 180ms ease;
+    visibility: hidden;
+    transition:
+      transform 180ms ease,
+      visibility 180ms ease;
     width: 242px;
     padding: 25px 19px 0;
   }
   .sidebar.open {
     transform: translateX(0);
+    visibility: visible;
   }
   .brand {
     font-size: 23px;
@@ -2150,6 +2154,9 @@ kbd {
     min-height: 160px;
     padding-left: 0;
     padding-right: 0;
+  }
+  .plot text {
+    font-size: 10px;
   }
   .theory-content {
     padding: 12px 17px 18px;

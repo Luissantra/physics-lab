@@ -115,6 +115,8 @@ export default function App() {
   const [toast, setToast] = useState("");
   const canvas = useRef<HTMLCanvasElement>(null);
   const canvasDialog = useRef<HTMLDialogElement>(null);
+  const menuButton = useRef<HTMLButtonElement>(null);
+  const sidebar = useRef<HTMLElement>(null);
   const toastTimeout = useRef<ReturnType<typeof setTimeout> | undefined>(
     undefined,
   );
@@ -129,6 +131,12 @@ export default function App() {
   }, []);
 
   useEffect(() => () => clearTimeout(toastTimeout.current), []);
+
+  useEffect(() => {
+    if (mobileMenu || !window.matchMedia("(max-width: 780px)").matches) return;
+    if (sidebar.current?.contains(document.activeElement))
+      menuButton.current?.focus();
+  }, [mobileMenu]);
 
   useEffect(() => {
     if (!running || page !== "lab" || comparisonMode) return;
@@ -380,7 +388,7 @@ export default function App() {
           onClick={() => setMobileMenu(false)}
         />
       )}
-      <aside className={`sidebar ${mobileMenu ? "open" : ""}`}>
+      <aside ref={sidebar} className={`sidebar ${mobileMenu ? "open" : ""}`}>
         <button
           className="brand"
           onClick={() => {
@@ -485,6 +493,7 @@ export default function App() {
         <header className="topbar">
           <div className="breadcrumb">
             <button
+              ref={menuButton}
               className="mobile-toggle icon-button"
               aria-label="Abrir menú"
               onClick={() => setMobileMenu(true)}
