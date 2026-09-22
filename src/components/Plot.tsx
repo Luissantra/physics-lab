@@ -5,7 +5,8 @@ export function formatNumber(value: number, digits = 3): string {
   if (!Number.isFinite(value)) return "—";
   if (
     Math.abs(value) > 0 &&
-    (Math.abs(value) < 0.001 || Math.abs(value) >= 100000)
+    (Math.abs(value) < Math.max(0.001, 10 ** -digits) ||
+      Math.abs(value) >= 100000)
   )
     return value.toExponential(2);
   return value.toLocaleString("es-ES", { maximumFractionDigits: digits });
